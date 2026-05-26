@@ -1,0 +1,161 @@
+spring:
+  application:
+    name: payment-gateway-cip
+
+  # ─────────────────────────────────────────────
+  # DataSource – PostgreSQL
+  # ─────────────────────────────────────────────
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/payment_gateway}
+    username: ${DB_USERNAME:pguser}
+    password: ${DB_PASSWORD:pgpassword}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: HikariPool-PaymentGateway
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+
+  # ─────────────────────────────────────────────
+  # JPA / Hibernate
+  # ─────────────────────────────────────────────
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate          # Flyway manages the schema; Hibernate only validates
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: public
+        jdbc:
+          time_zone: Asia/Jakarta
+
+  # ─────────────────────────────────────────────
+  # Flyway – Database Migrations
+  # ─────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    out-of-order: false
+
+  # ─────────────────────────────────────────────
+  # Kafka
+  # ─────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: payment-gateway-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.koriebruh.paymentgatewaycip.event"
+        spring.json.use.type.headers: false
+      enable-auto-commit: false
+    listener:
+      ack-mode: MANUAL_IMMEDIATE
+
+  # ─────────────────────────────────────────────
+  # Security – OAuth2 Resource Server (JWT)
+  # ─────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${OAUTH2_JWK_SET_URI:http://localhost:8080/realms/payment/protocol/openid-connect/certs}
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:8080/realms/payment}
+
+# ─────────────────────────────────────────────
+# Server
+# ─────────────────────────────────────────────
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /api
+
+# ─────────────────────────────────────────────
+# Actuator
+# ─────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# ─────────────────────────────────────────────
+# Resilience4j – Circuit Breaker
+# ─────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      corebank:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+        event-consumer-buffer-size: 10
+      biller:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 15s
+        failure-rate-threshold: 50
+        event-consumer-buffer-size: 10
+
+# ─────────────────────────────────────────────
+# SpringDoc / OpenAPI
+# ─────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    groups-order: DESC
+    operations-sorter: method
+
+# ─────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.koriebruh.paymentgatewaycip: DEBUG
+    org.springframework.kafka: INFO
+    org.flywaydb: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ─────────────────────────────────────────────
+# Custom App Properties  (mapped via AppProperties.java)
+# ─────────────────────────────────────────────
+app:
+  kafka:
+    topics:
+      transaction-created: payment.transaction.created
+      transaction-updated: payment.transaction.updated
+      transaction-failed: payment.transaction.failed
