@@ -60,19 +60,17 @@ services:
       retries: 5
 
   kafka-init:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.6.1
     depends_on:
       kafka:
         condition: service_healthy
     entrypoint: [ "/bin/sh", "-c" ]
     command: |
-      "
       cub kafka-ready -b kafka:29092 1 20
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.transaction.created --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.transaction.updated --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.transaction.failed --partitions 3 --replication-factor 1
       echo 'Topics created successfully!'
-      "
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -85,9 +83,22 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    entrypoint: [ "/bin/sh", "-c" ]
     ports:
       - "8090:8080"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: keycloak-server
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HTTPS_KEY_STORE_FILE=/opt/keycloak/keys/keystore.p12
+      - KC_HTTPS_KEY_STORE_PASSWORD=password123
+    command: start-dev
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./src/main/resources/keys:/opt/keycloak/keys
 
 volumes:
   pg_data:

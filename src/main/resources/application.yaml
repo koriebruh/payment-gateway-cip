@@ -2,6 +2,10 @@ spring:
   application:
     name: payment-gateway-cip
 
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
   # ─────────────────────────────────────────────
   # DataSource – PostgreSQL
   # ─────────────────────────────────────────────
@@ -68,14 +72,12 @@ spring:
       ack-mode: MANUAL_IMMEDIATE
 
   # ─────────────────────────────────────────────
-  # Security – OAuth2 Resource Server (JWT)
+  # Security – OAuth2 Resource Server
   # ─────────────────────────────────────────────
   security:
     oauth2:
       resourceserver:
-        jwt:
-          jwk-set-uri: ${OAUTH2_JWK_SET_URI:http://localhost:8080/realms/payment/protocol/openid-connect/certs}
-          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:8080/realms/payment}
+        jwt: {} # Decoded manually using local RSA key in SecurityConfig
 
 # ─────────────────────────────────────────────
 # Server
@@ -148,7 +150,7 @@ logging:
     org.springframework.kafka: INFO
     org.flywaydb: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [traceId=%X{traceId}] %-5level %logger{36} - %msg%n"
 
 # ─────────────────────────────────────────────
 # Custom App Properties  (mapped via AppProperties.java)
@@ -159,3 +161,10 @@ app:
       transaction-created: payment.transaction.created
       transaction-updated: payment.transaction.updated
       transaction-failed: payment.transaction.failed
+
+# ─────────────────────────────────────────────
+# RSA Keys for JWT
+# ─────────────────────────────────────────────
+rsa:
+  private-key: classpath:keys/private.pem
+  public-key: classpath:keys/public.pem

@@ -1,0 +1,74 @@
+### Payment Gateway API Tests
+# This file is used to test endpoints using IntelliJ HTTP Client or VSCode REST Client.
+# Ensure the application is running locally on port 8080.
+# 
+# IMPORTANT: Replace the 'jwt_token' variable with a valid RSA-signed token for your local test environment.
+
+@host = http://localhost:8080/api
+@jwt_token = <INSERT_VALID_JWT_TOKEN_HERE>
+@orderId = test-order-{{$random.uuid}}
+
+### 1. Process a new Payment (Success Scenario)
+# Expected outcome: 201 Created
+POST {{host}}/payments
+Authorization: Bearer {{jwt_token}}
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amount": 150000.00,
+  "currency": "IDR",
+  "paymentMethod": "VIRTUAL_ACCOUNT",
+  "channel": "MOBILE_BANKING"
+}
+
+### 2. Process Payment (Insufficient Balance - CoreBank Failure)
+# Account starting with '99' triggers the mock CoreBankingClient failure.
+# Expected outcome: 200 OK with FAILED status and "Insufficient balance" message
+POST {{host}}/payments
+Authorization: Bearer {{jwt_token}}
+Content-Type: application/json
+
+{
+  "orderId": "99-fail-{{$random.uuid}}",
+  "amount": 50000.00,
+  "currency": "IDR",
+  "paymentMethod": "QRIS",
+  "channel": "ATM"
+}
+
+### 3. Process Payment (Biller Failure)
+# Payment method 'FAIL' triggers the mock BillerClient failure.
+# Expected outcome: 200 OK with FAILED status and "Biller service unavailable" message
+POST {{host}}/payments
+Authorization: Bearer {{jwt_token}}
+Content-Type: application/json
+
+{
+  "orderId": "biller-fail-{{$random.uuid}}",
+  "amount": 75000.00,
+  "currency": "IDR",
+  "paymentMethod": "FAIL",
+  "channel": "MOBILE_BANKING"
+}
+
+### 4. Process Payment (Duplicate OrderId)
+# Run this twice with the same orderId to trigger idempotency violation.
+# Expected outcome: 409 Conflict (Duplicate order ID)
+POST {{host}}/payments
+Authorization: Bearer {{jwt_token}}
+Content-Type: application/json
+
+{
+  "orderId": "static-order-12345",
+  "amount": 10000.00,
+  "currency": "IDR",
+  "paymentMethod": "CREDIT_CARD",
+  "channel": "INTERNET_BANKING"
+}
+
+### 5. Get Transaction Status
+# Replace {orderId} with the ID of a previously created transaction.
+# Expected outcome: 200 OK with current transaction status
+GET {{host}}/payments/static-order-12345
+Authorization: Bearer {{jwt_token}}
