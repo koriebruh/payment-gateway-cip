@@ -6,9 +6,6 @@ spring:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_null
 
-  # ─────────────────────────────────────────────
-  # DataSource – PostgreSQL
-  # ─────────────────────────────────────────────
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/payment_gateway}
     username: ${DB_USERNAME:pguser}
@@ -22,13 +19,11 @@ spring:
       connection-timeout: 20000
       max-lifetime: 1800000
 
-  # ─────────────────────────────────────────────
-  # JPA / Hibernate
-  # ─────────────────────────────────────────────
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: validate          # Flyway manages the schema; Hibernate only validates
+      # Flyway owns schema lifecycle; Hibernate only validates at startup
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -37,18 +32,12 @@ spring:
         jdbc:
           time_zone: Asia/Jakarta
 
-  # ─────────────────────────────────────────────
-  # Flyway – Database Migrations
-  # ─────────────────────────────────────────────
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
     out-of-order: false
 
-  # ─────────────────────────────────────────────
-  # Kafka
-  # ─────────────────────────────────────────────
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -71,26 +60,27 @@ spring:
     listener:
       ack-mode: MANUAL_IMMEDIATE
 
-  # ─────────────────────────────────────────────
-  # Security – OAuth2 Resource Server
-  # ─────────────────────────────────────────────
   security:
     oauth2:
       resourceserver:
-        jwt: {} # Decoded manually using local RSA key in SecurityConfig
+        jwt:
+          issuer-uri: http://localhost:8081/realms/{realm-name}
+          jwk-set-uri: http://localhost:8081/realms/{realm-name}/protocol/openid-connect/certs
 
-# ─────────────────────────────────────────────
-# Server
-# ─────────────────────────────────────────────
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /api
 
-# ─────────────────────────────────────────────
-# Actuator
-# ─────────────────────────────────────────────
+# Micrometer Tracing → exports 100% of spans to Jaeger via OTLP gRPC (port 4317)
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      transport: grpc
   endpoints:
     web:
       exposure:
@@ -103,9 +93,6 @@ management:
     circuitbreakers:
       enabled: true
 
-# ─────────────────────────────────────────────
-# Resilience4j – Circuit Breaker
-# ─────────────────────────────────────────────
 resilience4j:
   circuitbreaker:
     instances:
@@ -128,9 +115,6 @@ resilience4j:
         failure-rate-threshold: 50
         event-consumer-buffer-size: 10
 
-# ─────────────────────────────────────────────
-# SpringDoc / OpenAPI
-# ─────────────────────────────────────────────
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -140,9 +124,6 @@ springdoc:
     groups-order: DESC
     operations-sorter: method
 
-# ─────────────────────────────────────────────
-# Logging
-# ─────────────────────────────────────────────
 logging:
   level:
     root: INFO
@@ -152,9 +133,6 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [traceId=%X{traceId}] %-5level %logger{36} - %msg%n"
 
-# ─────────────────────────────────────────────
-# Custom App Properties  (mapped via AppProperties.java)
-# ─────────────────────────────────────────────
 app:
   kafka:
     topics:
@@ -162,9 +140,6 @@ app:
       transaction-updated: payment.transaction.updated
       transaction-failed: payment.transaction.failed
 
-# ─────────────────────────────────────────────
-# RSA Keys for JWT
-# ─────────────────────────────────────────────
 rsa:
   private-key: classpath:keys/private.pem
   public-key: classpath:keys/public.pem

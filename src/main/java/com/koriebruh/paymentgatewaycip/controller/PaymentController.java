@@ -17,10 +17,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * REST controller for payment operations.
- * Base path: /payments (context path /api from application.yaml → full: /api/payments)
- */
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor

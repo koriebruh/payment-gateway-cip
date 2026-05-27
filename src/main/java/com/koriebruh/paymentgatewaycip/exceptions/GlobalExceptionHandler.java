@@ -14,10 +14,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Centralized exception handler for all REST controllers.
- * Maps exceptions to structured {@link ApiResponse} bodies with traceId.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -58,8 +54,6 @@ public class GlobalExceptionHandler {
                 .internalServerError()
                 .body(buildError("An unexpected error occurred.", List.of()));
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
     private ApiResponse<Void> buildError(String message, List<String> errors) {
         return new ApiResponse<>(LocalDateTime.now(), traceId(), "FAILED", message, null, errors);

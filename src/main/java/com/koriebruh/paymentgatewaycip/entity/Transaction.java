@@ -28,20 +28,12 @@ public class Transaction {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    /**
-     * Unique order identifier (e.g., INV-001)
-     */
     @Column(name = "order_id", nullable = false, unique = true, length = 255)
     private String orderId;
 
-    /**
-     * Channel used for the transaction.
-     * Allowed values: MOBILE_BANKING, INTERNET_BANKING, ATM
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "channel", nullable = false, length = 50)
     private Channel channel;
-
 
     @Column(name = "amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
@@ -56,22 +48,20 @@ public class Transaction {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod;
 
-    /**
-     * Current transaction status.
-     * Allowed values: PENDING, SUCCESS, FAILED
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private TransactionStatus status;
 
     /**
-     * Reference number returned by the core banking system
+     * Reference number from the core banking system after a successful debit.
+     * Populated only on SUCCESS; null on PENDING or FAILED.
      */
     @Column(name = "corebank_reference", length = 255)
     private String corebankReference;
 
     /**
-     * Reference number returned by the biller / payment provider
+     * Reference number from the biller aggregator after a successful payment forward.
+     * Populated only on SUCCESS; null on PENDING or FAILED.
      */
     @Column(name = "biller_reference", length = 255)
     private String billerReference;
@@ -83,7 +73,6 @@ public class Transaction {
     @Column(name = "updated_at",
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime updatedAt;
-
 
     @PrePersist
     protected void onCreate() {
@@ -98,7 +87,6 @@ public class Transaction {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-
 
     public enum Channel {
         MOBILE_BANKING,

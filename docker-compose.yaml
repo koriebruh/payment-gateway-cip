@@ -92,13 +92,22 @@ services:
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KC_HTTPS_KEY_STORE_FILE=/opt/keycloak/keys/keystore.p12
-      - KC_HTTPS_KEY_STORE_PASSWORD=password123
-    command: start-dev
+    command: start-dev --import-realm
     ports:
       - "8081:8080"
     volumes:
       - ./src/main/resources/keys:/opt/keycloak/keys
+      - ./keycloak:/opt/keycloak/data/import
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: jaeger_payment_gateway
+    ports:
+      - "16686:16686" # UI Jaeger
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
 
 volumes:
   pg_data:
