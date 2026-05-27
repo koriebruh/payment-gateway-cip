@@ -1,0 +1,59 @@
+{
+  "realm" : "PaymentGatewayRealm",
+  "users" : [ {
+    "id" : "dda4ee32-d6bf-43f5-95c5-9f7ca8f11864",
+    "username" : "api-user",
+    "emailVerified" : false,
+    "createdTimestamp" : 1779856082841,
+    "enabled" : true,
+    "totp" : false,
+    "credentials" : [ {
+      "id" : "8684187e-f186-4283-9309-455273d44552",
+      "type" : "password",
+      "createdDate" : 1779856093322,
+      "secretData" : "{\"value\":\"iWmEXDnouCfpeS1sLST7cpXRa76xueAR08OeSlB1vNRbEHiVfuufpp3anAr69tb4vjJTDe+hbYAsB0xI9YaBFw==\",\"salt\":\"lACzqchnvUj7jffSy49hjg==\",\"additionalParameters\":{}}",
+      "credentialData" : "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+    } ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-paymentgatewayrealm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  }, {
+    "id" : "a3858f3a-bd6a-48be-9890-854c7e001927",
+    "username" : "payment-user",
+    "firstName" : "Payment",
+    "lastName" : "User",
+    "email" : "usertest@gmail.com",
+    "emailVerified" : true,
+    "createdTimestamp" : 1779853293976,
+    "enabled" : true,
+    "totp" : false,
+    "credentials" : [ {
+      "id" : "5137266e-b471-412f-920f-2ca803b7ae69",
+      "type" : "password",
+      "createdDate" : 1779856016775,
+      "secretData" : "{\"value\":\"QGfyRGEugag6uy9Nrc7b3CqsNWBihk/IdONXAjP8C90dAIxXrDTm73jIMq9fFSkwF5IdRiDMOqhoN3Iae6MmcA==\",\"salt\":\"FOvSDGr5pMdkMmrDR35/Ug==\",\"additionalParameters\":{}}",
+      "credentialData" : "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+    } ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-paymentgatewayrealm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  }, {
+    "id" : "9b06c974-a62b-4cd4-ad28-5e18503dfb27",
+    "username" : "service-account-payment-gateway-client",
+    "emailVerified" : false,
+    "createdTimestamp" : 1779854605563,
+    "enabled" : true,
+    "totp" : false,
+    "serviceAccountClientId" : "payment-gateway-client",
+    "credentials" : [ ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-paymentgatewayrealm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  } ]
+}

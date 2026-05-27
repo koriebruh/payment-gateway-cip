@@ -1,9 +1,3 @@
-### Payment Gateway API Tests
-# This file is used to test endpoints using IntelliJ HTTP Client or VSCode REST Client.
-# Ensure the application is running locally on port 8080.
-# 
-# IMPORTANT: Replace the 'jwt_token' variable with a valid RSA-signed token for your local test environment.
-
 @host = http://localhost:8080/api
 @jwt_token = <INSERT_VALID_JWT_TOKEN_HERE>
 @orderId = test-order-{{$random.uuid}}

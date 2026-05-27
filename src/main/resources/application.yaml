@@ -22,7 +22,6 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      # Flyway owns schema lifecycle; Hibernate only validates at startup
       ddl-auto: validate
     show-sql: false
     properties:
@@ -72,15 +71,16 @@ server:
   servlet:
     context-path: /api
 
-# Micrometer Tracing → exports 100% of spans to Jaeger via OTLP gRPC (port 4317)
 management:
   tracing:
     sampling:
       probability: 1.0
-  otlp:
+  opentelemetry:
     tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
-      transport: grpc
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+          transport: grpc
   endpoints:
     web:
       exposure:

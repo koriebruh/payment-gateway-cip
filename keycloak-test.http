@@ -1,0 +1,28 @@
+### 1. Ambil Token dari Keycloak
+POST http://localhost:8081/realms/PaymentGatewayRealm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=payment-gateway-client&
+client_secret=J8lGF7B4byHLgUJVU3w3a8Af802p2q6I&
+grant_type=password&
+username=payment-user&
+password=password123&
+scope=openid
+> {%
+    // Script ini buat nge-set variabel 'token' secara otomatis
+    client.global.set("token", response.body.access_token);
+%}
+
+
+### 2. Panggil API Payment (Pakai Token yang tadi didapat)
+POST http://localhost:8080/api/payments
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "order_id": "INV-2026-001",
+  "channel": "MOBILE_BANKING",
+  "amount": 50000.00,
+  "currency": "IDR",
+  "payment_method": "VIRTUAL_ACCOUNT"
+}
