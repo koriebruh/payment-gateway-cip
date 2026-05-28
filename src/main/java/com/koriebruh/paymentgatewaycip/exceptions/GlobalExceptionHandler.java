@@ -38,6 +38,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(buildError("Validation failed", errors));
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingHeader(org.springframework.web.bind.MissingRequestHeaderException ex) {
+        log.warn("[{}] Missing header — {}", traceId(), ex.getHeaderName());
+        return ResponseEntity.badRequest().body(buildError("Missing required header: " + ex.getHeaderName(), List.of("MISSING_HEADER")));
+    }
+
     @ExceptionHandler(io.github.resilience4j.circuitbreaker.CallNotPermittedException.class)
     public ResponseEntity<ApiResponse<Void>> handleCircuitOpen(
             io.github.resilience4j.circuitbreaker.CallNotPermittedException ex) {
