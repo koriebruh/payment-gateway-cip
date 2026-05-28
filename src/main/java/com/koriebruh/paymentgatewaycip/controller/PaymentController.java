@@ -26,11 +26,11 @@ public class PaymentController {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
 
-    private final PaymentService     paymentService;
+    private final PaymentService paymentService;
     private final ApiResponseFactory responseFactory;
 
     @Operation(summary = "Process a payment",
-               description = "Debit account via CoreBank, forward to Biller, return final status.")
+            description = "Debit account via CoreBank, forward to Biller, return final status.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Payment processed"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation error"),
@@ -41,14 +41,16 @@ public class PaymentController {
     })
     @PostMapping
     public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(
-            @Valid @RequestBody PaymentRequest request) {
+            @Valid @RequestBody PaymentRequest request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey) {
 
-        log.info("POST /payments orderId={}", request.orderId());
-        PaymentResponse result = paymentService.processPayment(request);
+        log.info("POST /payments orderId={} idempotencyKey={}", request.orderId(), idempotencyKey);
+        PaymentResponse result = paymentService.processPayment(request, idempotencyKey);
 
         HttpStatus status = "SUCCESS".equals(result.status()) ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(responseFactory.success(result, "Payment processed"));
     }
+
 
     @Operation(summary = "Get transaction status", description = "Returns status and references for an orderId.")
     @ApiResponses({

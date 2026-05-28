@@ -1,5 +1,6 @@
 package com.koriebruh.paymentgatewaycip.mock;
 
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -7,10 +8,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/**
- * Mock implementation of {@link BillerClient} for local development.
- * Payment method "FAIL" always fails. 150ms artificial latency.
- */
 @Component
 public class BillerClientMock implements BillerClient {
 
@@ -19,17 +16,20 @@ public class BillerClientMock implements BillerClient {
     private static final long LATENCY_MS = 150L;
 
     @Override
-    public BillerResponse pay(String orderId, BigDecimal amount, String paymentMethod) {
-        log.info("[Biller-Mock] Pay — orderId={} amount={} method={}", orderId, amount, paymentMethod);
+    @Observed(name = "biller.client.pay", contextualName = "billerClientPay")
+    public BillerResponse pay(String orderId, BigDecimal amount, String paymentMethod,
+                              String traceId, String jwtToken) {
+        log.info("[Biller-Mock] Pay — orderId={} amount={} method={} traceId={} hasToken={}",
+                orderId, amount, paymentMethod, traceId, jwtToken != null);
         simulateLatency();
 
         if (FAIL_METHOD.equalsIgnoreCase(paymentMethod)) {
-            log.warn("[Biller-Mock] Payment failed — method={}", paymentMethod);
+            log.warn("[Biller-Mock] Payment failed — method={} traceId={}", paymentMethod, traceId);
             return new BillerResponse(false, null, "Biller service unavailable");
         }
 
-        String ref = "BL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        log.info("[Biller-Mock] Payment success — ref={}", ref);
+        var ref = "BL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        log.info("[Biller-Mock] Payment success — ref={} traceId={}", ref, traceId);
         return new BillerResponse(true, ref, null);
     }
 

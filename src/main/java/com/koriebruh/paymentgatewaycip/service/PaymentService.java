@@ -3,8 +3,6 @@ package com.koriebruh.paymentgatewaycip.service;
 import com.koriebruh.paymentgatewaycip.dto.PaymentRequest;
 import com.koriebruh.paymentgatewaycip.dto.PaymentResponse;
 import com.koriebruh.paymentgatewaycip.entity.Transaction;
-import com.koriebruh.paymentgatewaycip.event.model.TransactionSuccessEvent;
-import com.koriebruh.paymentgatewaycip.event.producer.TransactionEventProducer;
 import com.koriebruh.paymentgatewaycip.exceptions.BusinessException;
 import com.koriebruh.paymentgatewaycip.mock.BillerClient;
 import com.koriebruh.paymentgatewaycip.mock.CoreBankingClient;
@@ -15,77 +13,89 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
-/**
- * Core payment processing orchestrator.
- *
- * <p><b>Financial integrity guarantees:</b>
- * <ul>
- *   <li><b>Idempotency:</b> {@code orderId} uniqueness is enforced before any money movement.</li>
- *   <li><b>Circuit Breaker:</b> CoreBank and Biller calls are protected by Resilience4j to fail-fast.</li>
- *   <li><b>Event sourcing:</b> Final state (SUCCESS/FAILED) is published to Kafka for downstream consistency.</li>
- *   <li><b>Reconciliation note:</b> A biller failure after a successful core-bank debit requires
- *       an async reversal job in production. This is not implemented in this mock.</li>
- * </ul>
- */
 @Service
-@RequiredArgsConstructor
 @Observed(name = "payment.service")
 public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
-    private final TransactionRepository    transactionRepository;
-    private final CoreBankingClient        coreBankingClient;
-    private final BillerClient             billerClient;
-    private final TransactionEventProducer eventProducer;
+    private final TransactionRepository transactionRepository;
+
+    private final CoreBankingClient coreBankingClient;
+
+    private final BillerClient billerClient;
+
     private final PaymentTransactionHelper transactionHelper;
 
+    private final Executor taskExecutor;
+
+    public PaymentService(TransactionRepository transactionRepository,
+                          CoreBankingClient coreBankingClient,
+                          BillerClient billerClient,
+                          PaymentTransactionHelper transactionHelper,
+                          @Qualifier("applicationTaskExecutor") Executor taskExecutor) {
+        this.transactionRepository = transactionRepository;
+        this.coreBankingClient = coreBankingClient;
+        this.billerClient = billerClient;
+        this.transactionHelper = transactionHelper;
+        this.taskExecutor = taskExecutor;
+    }
+
     @Observed(name = "payment.process", contextualName = "processPayment")
-    public PaymentResponse processPayment(PaymentRequest request) {
-        String traceId = MDC.get("traceId");
+    public PaymentResponse processPayment(PaymentRequest request, String idempotencyKey) {
+        var traceId = MDC.get("traceId");
+        var jwtToken = extractJwtToken();
 
-        log.info("[{}] Processing payment — orderId={} channel={} amount={}",
-                traceId, request.orderId(), request.channel(), request.amount());
-
-        if (transactionRepository.existsByOrderId(request.orderId())) {
-            throw BusinessException.duplicateOrder(request.orderId());
+        var existingTxOpt = transactionHelper.getExistingIdempotentResponse(idempotencyKey, traceId);
+        if (existingTxOpt.isPresent()) {
+            return existingTxOpt.get();
         }
 
-        Transaction.Channel channel = parseChannel(request.channel());
-        Transaction tx = transactionHelper.savePending(request, channel);
+        var tx = transactionHelper.savePending(request, parseChannel(request.channel()), idempotencyKey);
+        log.info("Transaction persisted id={} status=PENDING traceId={}", tx.getId(), traceId);
 
-        log.info("[{}] Transaction persisted id={} status=PENDING", traceId, tx.getId());
+        var bankFuture = CompletableFuture.supplyAsync(
+                () -> callCoreBank(tx.getAccount(), tx.getAmount(), request.orderId(), traceId, jwtToken), taskExecutor);
+        var billerFuture = CompletableFuture.supplyAsync(
+                () -> callBiller(request.orderId(), tx.getAmount(), request.paymentMethod(), traceId, jwtToken), taskExecutor);
 
-        CoreBankingClient.CoreBankingResponse bankResp = callCoreBank(tx.getAccount(), tx.getAmount(), request.orderId());
+        CompletableFuture.allOf(bankFuture, billerFuture).join();
 
-        if (!bankResp.success()) {
-            log.warn("[{}] CoreBank rejected — reason={}", traceId, bankResp.failureReason());
-            return transactionHelper.failTransaction(tx, bankResp.failureReason(), traceId);
+        var bankResp = bankFuture.join();
+        var billerResp = billerFuture.join();
+
+        if (bankResp.success() && billerResp.success()) {
+            log.info("Payment approved — corebankRef={} billerRef={} traceId={}",
+                    bankResp.corebankReference(), billerResp.billerReference(), traceId);
+            return transactionHelper.succeedTransaction(tx, bankResp.corebankReference(), billerResp.billerReference(), traceId);
         }
 
-        log.info("[{}] CoreBank approved — ref={}", traceId, bankResp.corebankReference());
+        var reason = buildFailureReason(bankResp, billerResp);
+        log.warn("Payment rejected — reason={} traceId={}", reason, traceId);
+        return transactionHelper.failTransaction(tx, reason, traceId);
+    }
 
-        BillerClient.BillerResponse billerResp = callBiller(request.orderId(), tx.getAmount(), request.paymentMethod());
-
-        if (!billerResp.success()) {
-            log.warn("[{}] Biller rejected — reason={}", traceId, billerResp.failureReason());
-            return transactionHelper.failTransaction(tx, billerResp.failureReason(), traceId);
+    private String buildFailureReason(CoreBankingClient.CoreBankingResponse bankResp, BillerClient.BillerResponse billerResp) {
+        if (!bankResp.success() && !billerResp.success()) {
+            return "CoreBank: " + bankResp.failureReason() + " | Biller: " + billerResp.failureReason();
         }
-
-        log.info("[{}] Biller approved — ref={}", traceId, billerResp.billerReference());
-
-        return transactionHelper.succeedTransaction(tx, bankResp.corebankReference(), billerResp.billerReference(), traceId);
+        return !bankResp.success() ? "CoreBank: " + bankResp.failureReason() : "Biller: " + billerResp.failureReason();
     }
 
     @Observed(name = "payment.status", contextualName = "getPaymentStatus")
     @Transactional(readOnly = true)
     public PaymentResponse getStatus(String orderId) {
-        Transaction tx = transactionRepository.findByOrderId(orderId)
+        var tx = transactionRepository.findByOrderId(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Transaction not found: " + orderId));
 
         return new PaymentResponse(
@@ -100,14 +110,24 @@ public class PaymentService {
 
     @CircuitBreaker(name = "corebank")
     @Observed(name = "corebank.debit", contextualName = "coreBankDebit")
-    protected CoreBankingClient.CoreBankingResponse callCoreBank(String account, BigDecimal amount, String orderId) {
-        return coreBankingClient.debit(account, amount, orderId);
+    protected CoreBankingClient.CoreBankingResponse callCoreBank(
+            String account, BigDecimal amount, String orderId, String traceId, String jwtToken) {
+        return coreBankingClient.debit(account, amount, orderId, traceId, jwtToken);
     }
 
     @CircuitBreaker(name = "biller")
     @Observed(name = "biller.pay", contextualName = "billerPay")
-    protected BillerClient.BillerResponse callBiller(String orderId, BigDecimal amount, String paymentMethod) {
-        return billerClient.pay(orderId, amount, paymentMethod);
+    protected BillerClient.BillerResponse callBiller(
+            String orderId, BigDecimal amount, String paymentMethod, String traceId, String jwtToken) {
+        return billerClient.pay(orderId, amount, paymentMethod, traceId, jwtToken);
+    }
+
+    private String extractJwtToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getTokenValue();
+        }
+        return null;
     }
 
     private Transaction.Channel parseChannel(String raw) {

@@ -1,18 +1,35 @@
+
+### 1. Ambil Token dari Keycloak
+POST http://localhost:8081/realms/PaymentGatewayRealm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=payment-gateway-client&
+client_secret=J8lGF7B4byHLgUJVU3w3a8Af802p2q6I&
+grant_type=password&
+username=payment-user&
+password=password123&
+scope=openid
+
+### DEFINITONS
 @host = http://localhost:8080/api
-@jwt_token = <INSERT_VALID_JWT_TOKEN_HERE>
-@orderId = test-order-{{$random.uuid}}
+@jwt_token = eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI2MWRRdVR2bHEyVW5Zb1dWdDY1Yml1dXRBRzZDbk9scDZTZzR1UGo1ZVNjIn0.eyJleHAiOjE3Nzk5ODMxNTIsImlhdCI6MTc3OTk4Mjg1MiwianRpIjoiNjc4Mzg3ZmItNjAyZi00ZWVkLTljMGYtYjFmZmY3YWI0NjA1IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy9QYXltZW50R2F0ZXdheVJlYWxtIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImEzODU4ZjNhLWJkNmEtNDhiZS05ODkwLTg1NGM3ZTAwMTkyNyIsInR5cCI6IkJlYXJlciIsImF6cCI6InBheW1lbnQtZ2F0ZXdheS1jbGllbnQiLCJzZXNzaW9uX3N0YXRlIjoiZDRiOWRlOTctZTIzOC00NWJiLTlkNjQtNDQ4Yjg4NzI3NTBjIiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyIqIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdC1yb2xlcy1wYXltZW50Z2F0ZXdheXJlYWxtIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsInNpZCI6ImQ0YjlkZTk3LWUyMzgtNDViYi05ZDY0LTQ0OGI4ODcyNzUwYyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiUGF5bWVudCBVc2VyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicGF5bWVudC11c2VyIiwiZ2l2ZW5fbmFtZSI6IlBheW1lbnQiLCJmYW1pbHlfbmFtZSI6IlVzZXIiLCJlbWFpbCI6InVzZXJ0ZXN0QGdtYWlsLmNvbSJ9.L7NIy4bMw-QYUfr8XkleQpZhuNCmaWoy6B_7HNec3j1lTr0RsVuzz23AkGa7z6lgvlQgwf5ZotXLtEMyE2Z9DMdroNSiBj2riL3v73Pp1rdFHdZtp9j9CTEaHMcQsjUUlsAz-p6YpLVq3Fto_m_mI7GYHg0g7c7Xdux2-snoC1GM5d_1ZHo-IKNlbLTPjF56mchQRcHU5C1QgrcoLLOn_KzYEKCIJ7M1kiRcMDHu8sme3eNunF1WwOz-qas5vBg2mQMx3B3nhgXug1P5Kbwu0110544FtFAMrrSt96itVGo8XiXhVnlSJsiyCRYAYlg1cLCQodIksA0vC-7l1SBcLQ
+@order_id = INV-{{$random.uuid}}
+@idempotent_key = IDEMP-77AF
+
 
 ### 1. Process a new Payment (Success Scenario)
 # Expected outcome: 201 Created
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
+Idempotency-Key: {{idempotent_key}}
 Content-Type: application/json
 
+
 {
-  "orderId": "{{orderId}}",
-  "amount": 150000.00,
+  "order_id": "{{order_id}}",
+  "amount": 1700.00,
   "currency": "IDR",
-  "paymentMethod": "VIRTUAL_ACCOUNT",
+  "payment_method": "VIRTUAL_ACCOUNT",
   "channel": "MOBILE_BANKING"
 }
 
@@ -21,13 +38,14 @@ Content-Type: application/json
 # Expected outcome: 200 OK with FAILED status and "Insufficient balance" message
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
+Idempotency-Key: {{$idempotent_key}}
 Content-Type: application/json
 
 {
-  "orderId": "99-fail-{{$random.uuid}}",
+  "order_id": "99-fail-{{$random.uuid}}",
   "amount": 50000.00,
   "currency": "IDR",
-  "paymentMethod": "QRIS",
+  "payment_method": "QRIS",
   "channel": "ATM"
 }
 
@@ -36,33 +54,35 @@ Content-Type: application/json
 # Expected outcome: 200 OK with FAILED status and "Biller service unavailable" message
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
+Idempotency-Key: {{$random.uuid}}
 Content-Type: application/json
 
 {
-  "orderId": "biller-fail-{{$random.uuid}}",
+  "order_id": "biller-fail-{{$random.uuid}}",
   "amount": 75000.00,
   "currency": "IDR",
-  "paymentMethod": "FAIL",
+  "payment_method": "FAIL",
   "channel": "MOBILE_BANKING"
 }
 
-### 4. Process Payment (Duplicate OrderId)
-# Run this twice with the same orderId to trigger idempotency violation.
-# Expected outcome: 409 Conflict (Duplicate order ID)
+### 4. Process Payment (Duplicate Idempotency Key)
+# Run this twice to trigger idempotency violation.
+# Expected outcome: 409 Conflict (Duplicate idempotency key)
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
+Idempotency-Key: static-idemp-12345
 Content-Type: application/json
 
 {
-  "orderId": "static-order-12345",
+  "order_id": "static-order-12345",
   "amount": 10000.00,
   "currency": "IDR",
-  "paymentMethod": "CREDIT_CARD",
+  "payment_method": "CREDIT_CARD",
   "channel": "INTERNET_BANKING"
 }
 
 ### 5. Get Transaction Status
-# Replace {orderId} with the ID of a previously created transaction.
+# Replace {order_id} with the ID of a previously created transaction.
 # Expected outcome: 200 OK with current transaction status
-GET {{host}}/payments/static-order-12345
+GET {{host}}/payments/INV-9fa64940-37c9-4fb9-b7c4-120f0b800f02
 Authorization: Bearer {{jwt_token}}

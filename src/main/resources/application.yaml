@@ -39,6 +39,8 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -57,14 +59,15 @@ spring:
         spring.json.use.type.headers: false
       enable-auto-commit: false
     listener:
+      observation-enabled: true
       ack-mode: MANUAL_IMMEDIATE
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8081/realms/{realm-name}
-          jwk-set-uri: http://localhost:8081/realms/{realm-name}/protocol/openid-connect/certs
+          issuer-uri: http://localhost:8081/realms/PaymentGatewayRealm
+          jwk-set-uri: http://localhost:8081/realms/PaymentGatewayRealm/protocol/openid-connect/certs
 
 server:
   port: ${SERVER_PORT:8080}

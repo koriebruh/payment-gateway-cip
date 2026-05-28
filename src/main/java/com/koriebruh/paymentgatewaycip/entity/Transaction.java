@@ -2,7 +2,6 @@ package com.koriebruh.paymentgatewaycip.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,9 +23,11 @@ import java.util.UUID;
 public class Transaction {
 
     @Id
-    @UuidGenerator
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id;
+    @Column(name = "id", nullable = false, updatable = false, length = 50)
+    private String id;
+
+    @Column(name = "idempotency_key", unique = true, length = 255)
+    private String idempotencyKey;
 
     @Column(name = "order_id", nullable = false, unique = true, length = 255)
     private String orderId;
@@ -76,6 +77,9 @@ public class Transaction {
 
     @PrePersist
     protected void onCreate() {
+        if (this.id == null) {
+            this.id = "TX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
         LocalDateTime now = LocalDateTime.now();
         if (this.createdAt == null) this.createdAt = now;
         if (this.updatedAt == null) this.updatedAt = now;

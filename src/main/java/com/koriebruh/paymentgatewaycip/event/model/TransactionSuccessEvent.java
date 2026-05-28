@@ -28,7 +28,7 @@ import java.util.UUID;
  * @param traceId          distributed trace identifier from MDC
  */
 public record TransactionSuccessEvent(
-        UUID           transactionId,
+        String         transactionId,
         String         orderId,
         String         account,
         BigDecimal     amount,

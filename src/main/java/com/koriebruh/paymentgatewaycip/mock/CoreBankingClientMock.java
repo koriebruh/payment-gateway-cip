@@ -1,5 +1,6 @@
 package com.koriebruh.paymentgatewaycip.mock;
 
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -7,11 +8,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/**
- * Mock implementation of {@link CoreBankingClient} for local development.
- * Accounts starting with "99" always fail (insufficient balance).
- * 100ms artificial latency simulates network round-trip.
- */
 @Component
 public class CoreBankingClientMock implements CoreBankingClient {
 
@@ -20,17 +16,20 @@ public class CoreBankingClientMock implements CoreBankingClient {
     private static final long LATENCY_MS = 100L;
 
     @Override
-    public CoreBankingResponse debit(String accountNumber, BigDecimal amount, String orderId) {
-        log.info("[CoreBank-Mock] Debit — account={} amount={} orderId={}", accountNumber, amount, orderId);
+    @Observed(name = "corebank.client.debit", contextualName = "coreBankClientDebit")
+    public CoreBankingResponse debit(String accountNumber, BigDecimal amount, String orderId,
+                                     String traceId, String jwtToken) {
+        log.info("[CoreBank-Mock] Debit — account={} amount={} orderId={} traceId={} hasToken={}",
+                accountNumber, amount, orderId, traceId, jwtToken != null);
         simulateLatency();
 
         if (accountNumber.startsWith(FAIL_PREFIX)) {
-            log.warn("[CoreBank-Mock] Insufficient balance — account={}", accountNumber);
+            log.warn("[CoreBank-Mock] Insufficient balance — account={} traceId={}", accountNumber, traceId);
             return new CoreBankingResponse(false, null, "Insufficient balance");
         }
 
-        String ref = "CB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        log.info("[CoreBank-Mock] Debit success — ref={}", ref);
+        var ref = "CB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        log.info("[CoreBank-Mock] Debit success — ref={} traceId={}", ref, traceId);
         return new CoreBankingResponse(true, ref, null);
     }
 

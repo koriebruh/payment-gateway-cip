@@ -10,6 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
+
 /**
  * Handles @Transactional boundary for payment state transitions.
  *
@@ -21,12 +26,35 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PaymentTransactionHelper {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentTransactionHelper.class);
+
     private final TransactionRepository    transactionRepository;
+
     private final TransactionEventProducer eventProducer;
 
+    @Transactional(readOnly = true)
+    public Optional<PaymentResponse> getExistingIdempotentResponse(String idempotencyKey, String traceId) {
+        var existingTxOpt = transactionRepository.findByIdempotencyKey(idempotencyKey);
+        if (existingTxOpt.isPresent()) {
+            var existingTx = existingTxOpt.get();
+            log.info("Idempotent request received, returning existing transaction id={} status={} traceId={}",
+                    existingTx.getId(), existingTx.getStatus(), traceId);
+            return Optional.of(new PaymentResponse(
+                    existingTx.getId(),
+                    existingTx.getOrderId(),
+                    existingTx.getStatus().name(),
+                    existingTx.getCorebankReference(),
+                    existingTx.getBillerReference(),
+                    "Payment processed successfully (Idempotent response)"
+            ));
+        }
+        return Optional.empty();
+    }
+
     @Transactional
-    public Transaction savePending(PaymentRequest request, Transaction.Channel channel) {
+    public Transaction savePending(PaymentRequest request, Transaction.Channel channel, String idempotencyKey) {
         Transaction tx = Transaction.builder()
+                .idempotencyKey(idempotencyKey)
                 .orderId(request.orderId())
                 .channel(channel)
                 .amount(request.amount())

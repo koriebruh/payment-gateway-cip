@@ -5,12 +5,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
+public interface TransactionRepository extends JpaRepository<Transaction, String> {
 
     boolean existsByOrderId(String orderId);
+
+    boolean existsByIdempotencyKey(String idempotencyKey);
+
+    Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
 
     Optional<Transaction> findByOrderId(String orderId);
 }

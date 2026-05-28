@@ -1,6 +1,5 @@
 package com.koriebruh.paymentgatewaycip.config;
 
-import com.koriebruh.paymentgatewaycip.filter.JwtAuthenticationFilter;
 import com.koriebruh.paymentgatewaycip.filter.TraceContextFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,12 +25,9 @@ public class SecurityConfig {
             "/api/auth/**"
     };
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
     private final TraceContextFilter traceFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
-                          TraceContextFilter traceFilter) {
-        this.jwtAuthFilter = jwtAuthFilter;
+    public SecurityConfig(TraceContextFilter traceFilter) {
         this.traceFilter = traceFilter;
     }
 
@@ -45,7 +41,6 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(traceFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .build();
     }
