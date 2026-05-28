@@ -20,6 +20,8 @@ import com.koriebruh.paymentgatewaycip.entity.OutboxEvent;
 import com.koriebruh.paymentgatewaycip.repository.OutboxEventRepository;
 import org.springframework.beans.factory.annotation.Value;
 
+import io.micrometer.observation.annotation.Observed;
+
 /**
  * Handles @Transactional boundary for payment state transitions.
  *
@@ -29,6 +31,7 @@ import org.springframework.beans.factory.annotation.Value;
  */
 @Component
 @RequiredArgsConstructor
+@Observed(name = "payment.transaction.helper")
 public class PaymentTransactionHelper {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentTransactionHelper.class);

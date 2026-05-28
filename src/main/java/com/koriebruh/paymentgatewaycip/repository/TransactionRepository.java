@@ -6,7 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+import io.micrometer.observation.annotation.Observed;
+
 @Repository
+@Observed(name = "transaction.repository")
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
 
     boolean existsByOrderId(String orderId);
