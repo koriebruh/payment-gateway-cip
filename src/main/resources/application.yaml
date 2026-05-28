@@ -140,9 +140,7 @@ app:
   kafka:
     topics:
       transaction-created: payment.transaction.created
-      transaction-updated: payment.transaction.updated
       transaction-failed: payment.transaction.failed
+  outbox:
+    poll-rate: 5000
 
-rsa:
-  private-key: classpath:keys/private.pem
-  public-key: classpath:keys/public.pem

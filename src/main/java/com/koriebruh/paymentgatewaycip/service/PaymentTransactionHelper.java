@@ -15,6 +15,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.koriebruh.paymentgatewaycip.entity.OutboxEvent;
+import com.koriebruh.paymentgatewaycip.repository.OutboxEventRepository;
+import org.springframework.beans.factory.annotation.Value;
+
 /**
  * Handles @Transactional boundary for payment state transitions.
  *
@@ -28,9 +33,15 @@ public class PaymentTransactionHelper {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentTransactionHelper.class);
 
-    private final TransactionRepository    transactionRepository;
+    private final TransactionRepository transactionRepository;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper          objectMapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
-    private final TransactionEventProducer eventProducer;
+    @Value("${app.kafka.topics.transaction-created}")
+    private String topicCreated;
+
+    @Value("${app.kafka.topics.transaction-failed}")
+    private String topicFailed;
 
     @Transactional(readOnly = true)
     public Optional<PaymentResponse> getExistingIdempotentResponse(String idempotencyKey, String traceId) {
@@ -70,7 +81,7 @@ public class PaymentTransactionHelper {
     public PaymentResponse failTransaction(Transaction tx, String reason, String traceId) {
         tx.setStatus(Transaction.TransactionStatus.FAILED);
         transactionRepository.save(tx);
-        eventProducer.publishFailed(TransactionSuccessEvent.from(tx, traceId));
+        saveOutboxEvent(tx, traceId, topicFailed);
 
         return new PaymentResponse(
                 tx.getId().toString(),
@@ -88,7 +99,7 @@ public class PaymentTransactionHelper {
         tx.setCorebankReference(corebankRef);
         tx.setBillerReference(billerRef);
         transactionRepository.save(tx);
-        eventProducer.publishSuccess(TransactionSuccessEvent.from(tx, traceId));
+        saveOutboxEvent(tx, traceId, topicCreated);
 
         return new PaymentResponse(
                 tx.getId().toString(),
@@ -98,5 +109,20 @@ public class PaymentTransactionHelper {
                 billerRef,
                 "Payment processed successfully"
         );
+    }
+
+    private void saveOutboxEvent(Transaction tx, String traceId, String topic) {
+        try {
+            String payload = objectMapper.writeValueAsString(TransactionSuccessEvent.from(tx, traceId));
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("Transaction")
+                    .aggregateId(tx.getId())
+                    .topic(topic)
+                    .payload(payload)
+                    .build();
+            outboxEventRepository.save(outboxEvent);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to serialize OutboxEvent", e);
+        }
     }
 }
