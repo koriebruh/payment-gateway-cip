@@ -55,13 +55,18 @@ class PaymentTransactionHelperTest {
                 .id(UUID.randomUUID().toString())
                 .orderId("ORD-1")
                 .status(Transaction.TransactionStatus.SUCCESS)
+                .channel(Transaction.Channel.MOBILE_BANKING)
+                .amount(BigDecimal.TEN)
+                .currency("IDR")
+                .paymentMethod("VA")
                 .corebankReference("CB-1")
                 .billerReference("BL-1")
                 .build();
         
         when(transactionRepository.findByIdempotencyKey("IDEMP-1")).thenReturn(Optional.of(tx));
 
-        Optional<PaymentResponse> response = helper.getExistingIdempotentResponse("IDEMP-1", "trace-123");
+        com.koriebruh.paymentgatewaycip.dto.PaymentRequest req = new com.koriebruh.paymentgatewaycip.dto.PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        Optional<PaymentResponse> response = helper.getExistingIdempotentResponse("IDEMP-1", req, "trace-123");
 
         assertThat(response).isPresent();
         assertThat(response.get().status()).isEqualTo("SUCCESS");
@@ -72,7 +77,7 @@ class PaymentTransactionHelperTest {
     void getExistingIdempotentResponse_WhenNotExists_ShouldReturnEmpty() {
         when(transactionRepository.findByIdempotencyKey("IDEMP-1")).thenReturn(Optional.empty());
 
-        Optional<PaymentResponse> response = helper.getExistingIdempotentResponse("IDEMP-1", "trace-123");
+        Optional<PaymentResponse> response = helper.getExistingIdempotentResponse("IDEMP-1", null, "trace-123");
 
         assertThat(response).isEmpty();
     }

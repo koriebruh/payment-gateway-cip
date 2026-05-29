@@ -59,7 +59,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    void processPayment_WhenFailed_ShouldReturn200() throws Exception {
+    void processPayment_WhenFailed_ShouldReturn400() throws Exception {
         PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
         PaymentResponse response = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "Failed");
 
@@ -69,9 +69,54 @@ class PaymentControllerTest {
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("FAILED"))
                 .andExpect(jsonPath("$.data.status").value("FAILED"));
+    }
+
+    @Test
+    void processPayment_WhenCoreBankFailed_ShouldReturn422() throws Exception {
+        PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        PaymentResponse response = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "CoreBank: Insufficient balance");
+
+        when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
+
+        mockMvc.perform(post("/payments")
+                .header("Idempotency-Key", "IDEMP-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+    }
+
+    @Test
+    void processPayment_WhenBillerFailed_ShouldReturn502() throws Exception {
+        PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        PaymentResponse response = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "Biller: Biller service unavailable");
+
+        when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
+
+        mockMvc.perform(post("/payments")
+                .header("Idempotency-Key", "IDEMP-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+    }
+
+    @Test
+    void processPayment_WhenIdempotentSuccess_ShouldReturn200() throws Exception {
+        PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        PaymentResponse response = new PaymentResponse("TX-1", "ORD-1", "SUCCESS", "CB-1", "BL-1", "Payment processed successfully (Idempotent response)");
+
+        when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
+
+        mockMvc.perform(post("/payments")
+                .header("Idempotency-Key", "IDEMP-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
     }
 
     @Test

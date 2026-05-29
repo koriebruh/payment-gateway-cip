@@ -46,6 +46,16 @@ public class ApiResponseFactory {
                 .build();
     }
 
+    public <T> ApiResponse<T> error(T data, String message) {
+        return ApiResponse.<T>builder()
+                .timestamp(LocalDateTime.now())
+                .traceId(traceId())
+                .status("FAILED")
+                .message(message)
+                .data(data)
+                .build();
+    }
+
     // -----------------------------------------------------------------------
 
     private String traceId() {

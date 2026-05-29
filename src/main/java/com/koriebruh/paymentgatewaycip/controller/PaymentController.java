@@ -47,8 +47,22 @@ public class PaymentController {
         log.info("POST /payments orderId={} idempotencyKey={}", request.orderId(), idempotencyKey);
         PaymentResponse result = paymentService.processPayment(request, idempotencyKey);
 
-        HttpStatus status = "SUCCESS".equals(result.status()) ? HttpStatus.CREATED : HttpStatus.OK;
-        return ResponseEntity.status(status).body(responseFactory.success(result, "Payment processed"));
+        if ("FAILED".equals(result.status())) {
+            HttpStatus status = HttpStatus.BAD_REQUEST;
+            if (result.message() != null && result.message().contains("Insufficient balance")) {
+                status = HttpStatus.UNPROCESSABLE_ENTITY;
+            } else if (result.message() != null && result.message().contains("Biller")) {
+                status = HttpStatus.BAD_GATEWAY;
+            }
+            return ResponseEntity.status(status)
+                    .body(responseFactory.error(result, "Payment processing failed"));
+        }
+
+        HttpStatus successStatus = (result.message() != null && result.message().contains("Idempotent")) 
+                ? HttpStatus.OK : HttpStatus.CREATED;
+
+        return ResponseEntity.status(successStatus)
+                .body(responseFactory.success(result, "Payment processed"));
     }
 
 

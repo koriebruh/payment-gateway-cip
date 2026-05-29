@@ -12,9 +12,9 @@ scope=openid
 
 ### DEFINITONS
 @host = http://localhost:8080/api
-@jwt_token = eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI2MWRRdVR2bHEyVW5Zb1dWdDY1Yml1dXRBRzZDbk9scDZTZzR1UGo1ZVNjIn0.eyJleHAiOjE3ODAwMjk5MDUsImlhdCI6MTc4MDAyOTYwNSwianRpIjoiMDRkY2JkYTMtNjdlZC00NmMzLWFmNzEtM2JhMDM3ZTYyZjk2IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy9QYXltZW50R2F0ZXdheVJlYWxtIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImEzODU4ZjNhLWJkNmEtNDhiZS05ODkwLTg1NGM3ZTAwMTkyNyIsInR5cCI6IkJlYXJlciIsImF6cCI6InBheW1lbnQtZ2F0ZXdheS1jbGllbnQiLCJzZXNzaW9uX3N0YXRlIjoiMTVjNTViZDUtYzU5OS00NzAwLThhZDMtYTc5MDUwYTRjY2Y4IiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyIqIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdC1yb2xlcy1wYXltZW50Z2F0ZXdheXJlYWxtIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsInNpZCI6IjE1YzU1YmQ1LWM1OTktNDcwMC04YWQzLWE3OTA1MGE0Y2NmOCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiUGF5bWVudCBVc2VyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicGF5bWVudC11c2VyIiwiZ2l2ZW5fbmFtZSI6IlBheW1lbnQiLCJmYW1pbHlfbmFtZSI6IlVzZXIiLCJlbWFpbCI6InVzZXJ0ZXN0QGdtYWlsLmNvbSJ9.KR3cXdqEdsRsSx81J6mr6E21l5oXeQ5TYX6LpUIRSFUspoNZsTnuFDdDvasqnsg0odmBLz0PG0KE3wMw_xxOamfrnl_5DhGSMCqYmTme6h9yOnXtH2tpk6sI7iAUbcdCL5nnxw3SFqStisvGPkkkoPlfl33CLIkRq7DZI4Pr-U_l1b4Xeb52wkSCZRMPtpgvWP8_crpkCmBFvYCPQWh-fAocGMO4QVBZNdwan4AizLrwNocd6sagVp5UBDRYOkJWe-Y6OLlRn1-9exgwQUJ9_2YaObDMw4zAB3ex2Z8xTyczOYdnX0iFr9E5wkGf0620u-LMkEvI5jTEIPUqAmjG7Q
-@order_id = INV-99FAA1AQQ
-@idempotent_key = IDEMP-99FAA1AQQ
+@jwt_token = eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI2MWRRdVR2bHEyVW5Zb1dWdDY1Yml1dXRBRzZDbk9scDZTZzR1UGo1ZVNjIn0.eyJleHAiOjE3ODAwMzM4MzksImlhdCI6MTc4MDAzMzUzOSwianRpIjoiYjY2NzA2MTktNjU5ZC00MmIyLTk3OWItMDgyYzdkMzcwMGU3IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy9QYXltZW50R2F0ZXdheVJlYWxtIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImEzODU4ZjNhLWJkNmEtNDhiZS05ODkwLTg1NGM3ZTAwMTkyNyIsInR5cCI6IkJlYXJlciIsImF6cCI6InBheW1lbnQtZ2F0ZXdheS1jbGllbnQiLCJzZXNzaW9uX3N0YXRlIjoiMmNmZDIyNWMtOGUyNC00OWZmLWI5YWYtMTVjMjUyNTJkMDYzIiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyIqIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdC1yb2xlcy1wYXltZW50Z2F0ZXdheXJlYWxtIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsInNpZCI6IjJjZmQyMjVjLThlMjQtNDlmZi1iOWFmLTE1YzI1MjUyZDA2MyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiUGF5bWVudCBVc2VyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicGF5bWVudC11c2VyIiwiZ2l2ZW5fbmFtZSI6IlBheW1lbnQiLCJmYW1pbHlfbmFtZSI6IlVzZXIiLCJlbWFpbCI6InVzZXJ0ZXN0QGdtYWlsLmNvbSJ9.Gl5fdQm5n50r4wG7FCcRjbroi18IW0grcaRPe5tjUZvVMNGLTx-fvtQxsNsX2Nynxu3oTZ7D3WJIWUczXC3U08i9KaHHEqlc1cXLgNuaHUDEzkGgwscIwcag8c_jBXMQzHP6lCJUbVNJAWJA3naEFCcKK67z2Me2A-K0PVXGcXbtjYmO1ld22kySPAWl6OR4Xny2bHzGp2h0l1tMIl1UF7JzMOMaRV5zJMqJHuRRG2LkueYQuX3HskHlkD3Oms3LrCzvtG8EZQfC4ulXO3dtnLsyrpulZZIiXxUe_oXEFvoze35ch04vB7f3bOPR0dIdOUGfg0F7bTBNgmlxMxFMeA
+@order_id = INV-99FAA1AQQA121189
+@idempotent_key = IDEMP-99FAA1AQQGs11189sssssssssssss
 
 
 ### 1. Process a new Payment (Success Scenario)
@@ -35,16 +35,16 @@ Content-Type: application/json
 
 ### 2. Process Payment (Insufficient Balance - CoreBank Failure)
 # Account starting with '99' triggers the mock CoreBankingClient failure.
-# Expected outcome: 200 OK with FAILED status and "Insufficient balance" message
+# Expected outcome: 422 Unprocessable Entity with root FAILED status and "Insufficient balance" message
 
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
-Idempotency-Key: {{$idempotent_key}}
+Idempotency-Key: {{idempotent_key}}
 Content-Type: application/json
 
 {
-  "order_id": "99-fail-cfgfadnasiuqw2",
-  "amount": 50000.00,
+  "order_id": "99-fail-cfgfadnasiuqw2a",
+  "amount": 99991.00,
   "currency": "IDR",
   "payment_method": "QRIS",
   "channel": "ATM"
@@ -52,7 +52,7 @@ Content-Type: application/json
 
 ### 3. Process Payment (Biller Failure)
 # Payment method 'FAIL' triggers the mock BillerClient failure.
-# Expected outcome: 200 OK with FAILED status and "Biller service unavailable" message
+# Expected outcome: 502 Bad Gateway with root FAILED status and "Biller service unavailable" message
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
 Idempotency-Key: {{$random.uuid}}
@@ -67,8 +67,8 @@ Content-Type: application/json
 }
 
 ### 4. Process Payment (Duplicate Idempotency Key)
-# Run this twice to trigger idempotency violation.
-# Expected outcome: 409 Conflict (Duplicate idempotency key)
+# Run this twice, BUT modify the payload (e.g., change amount or order_id) on the second run to trigger conflict.
+# Expected outcome: 409 Conflict (Duplicate idempotency key used with different payload)
 POST {{host}}/payments
 Authorization: Bearer {{jwt_token}}
 Idempotency-Key: static-idemp-12345

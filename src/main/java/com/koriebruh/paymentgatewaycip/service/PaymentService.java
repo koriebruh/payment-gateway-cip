@@ -56,7 +56,7 @@ public class PaymentService {
         var traceId = MDC.get("traceId");
         var jwtToken = extractJwtToken();
 
-        var existingTxOpt = transactionHelper.getExistingIdempotentResponse(idempotencyKey, traceId);
+        var existingTxOpt = transactionHelper.getExistingIdempotentResponse(idempotencyKey, request, traceId);
         if (existingTxOpt.isPresent()) {
             return existingTxOpt.get();
         }

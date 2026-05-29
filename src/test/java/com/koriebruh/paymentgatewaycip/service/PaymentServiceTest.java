@@ -74,7 +74,7 @@ class PaymentServiceTest {
         PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
         PaymentResponse existingResponse = new PaymentResponse("TX-1", "ORD-1", "SUCCESS", "CB-1", "BL-1", "Msg");
         
-        when(transactionHelper.getExistingIdempotentResponse(eq(idempotencyKey), any())).thenReturn(Optional.of(existingResponse));
+        when(transactionHelper.getExistingIdempotentResponse(eq(idempotencyKey), any(), any())).thenReturn(Optional.of(existingResponse));
 
         PaymentResponse response = paymentService.processPayment(request, idempotencyKey);
 
@@ -97,7 +97,7 @@ class PaymentServiceTest {
                 .status(Transaction.TransactionStatus.PENDING)
                 .build();
 
-        when(transactionHelper.getExistingIdempotentResponse(eq(idempotencyKey), any())).thenReturn(Optional.empty());
+        when(transactionHelper.getExistingIdempotentResponse(eq(idempotencyKey), any(), any())).thenReturn(Optional.empty());
         when(transactionHelper.savePending(any(), eq(Transaction.Channel.MOBILE_BANKING), eq(idempotencyKey))).thenReturn(pendingTx);
         
         when(coreBankingClient.debit(eq("ORD-1"), eq(BigDecimal.TEN), eq("ORD-1"), any(), eq("mock-token")))
@@ -128,7 +128,7 @@ class PaymentServiceTest {
                 .status(Transaction.TransactionStatus.PENDING)
                 .build();
 
-        when(transactionHelper.getExistingIdempotentResponse(anyString(), any())).thenReturn(Optional.empty());
+        when(transactionHelper.getExistingIdempotentResponse(anyString(), any(), any())).thenReturn(Optional.empty());
         when(transactionHelper.savePending(any(), any(), anyString())).thenReturn(pendingTx);
         
         when(coreBankingClient.debit(anyString(), any(), anyString(), any(), anyString()))
@@ -157,7 +157,7 @@ class PaymentServiceTest {
                 .status(Transaction.TransactionStatus.PENDING)
                 .build();
 
-        when(transactionHelper.getExistingIdempotentResponse(anyString(), any())).thenReturn(Optional.empty());
+        when(transactionHelper.getExistingIdempotentResponse(anyString(), any(), any())).thenReturn(Optional.empty());
         when(transactionHelper.savePending(any(), any(), anyString())).thenReturn(pendingTx);
         
         when(coreBankingClient.debit(anyString(), any(), anyString(), any(), anyString()))
@@ -175,14 +175,66 @@ class PaymentServiceTest {
     }
 
     @Test
-    void processPayment_WithInvalidChannel_ShouldThrowException() {
+    void processPayment_WhenInvalidChannel_ShouldThrowException() {
         PaymentRequest request = new PaymentRequest("ORD-1", "INVALID_CHANNEL", BigDecimal.TEN, "IDR", "VA");
         
-        when(transactionHelper.getExistingIdempotentResponse(anyString(), any())).thenReturn(Optional.empty());
+        when(transactionHelper.getExistingIdempotentResponse(anyString(), any(), any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> paymentService.processPayment(request, "IDEMP"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Unsupported channel");
+    }
+
+    @Test
+    void processPayment_WhenBillerFails_ShouldReturnFailedStatus() {
+        PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        Transaction pendingTx = Transaction.builder()
+                .id(UUID.randomUUID().toString())
+                .orderId("ORD-1")
+                .status(Transaction.TransactionStatus.PENDING)
+                .build();
+
+        when(transactionHelper.getExistingIdempotentResponse(anyString(), any(), any())).thenReturn(Optional.empty());
+        when(transactionHelper.savePending(any(), any(), anyString())).thenReturn(pendingTx);
+        
+        when(coreBankingClient.debit(any(), any(), any(), any(), any()))
+                .thenReturn(new CoreBankingClient.CoreBankingResponse(true, "CB-1", null));
+        when(billerClient.pay(any(), any(), any(), any(), any()))
+                .thenReturn(new BillerClient.BillerResponse(false, null, "Biller Error"));
+                
+        PaymentResponse failedResponse = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "Biller: Biller Error");
+        when(transactionHelper.failTransaction(eq(pendingTx), eq("Biller: Biller Error"), any())).thenReturn(failedResponse);
+
+        PaymentResponse response = paymentService.processPayment(request, "IDEMP");
+
+        assertThat(response.status()).isEqualTo("FAILED");
+        assertThat(response.message()).isEqualTo("Biller: Biller Error");
+    }
+
+    @Test
+    void processPayment_WhenBothFail_ShouldReturnFailedStatus() {
+        PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
+        Transaction pendingTx = Transaction.builder()
+                .id(UUID.randomUUID().toString())
+                .orderId("ORD-1")
+                .status(Transaction.TransactionStatus.PENDING)
+                .build();
+
+        when(transactionHelper.getExistingIdempotentResponse(anyString(), any(), any())).thenReturn(Optional.empty());
+        when(transactionHelper.savePending(any(), any(), anyString())).thenReturn(pendingTx);
+        
+        when(coreBankingClient.debit(any(), any(), any(), any(), any()))
+                .thenReturn(new CoreBankingClient.CoreBankingResponse(false, null, "CoreBank Error"));
+        when(billerClient.pay(any(), any(), any(), any(), any()))
+                .thenReturn(new BillerClient.BillerResponse(false, null, "Biller Error"));
+                
+        PaymentResponse failedResponse = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "CoreBank: CoreBank Error | Biller: Biller Error");
+        when(transactionHelper.failTransaction(eq(pendingTx), eq("CoreBank: CoreBank Error | Biller: Biller Error"), any())).thenReturn(failedResponse);
+
+        PaymentResponse response = paymentService.processPayment(request, "IDEMP");
+
+        assertThat(response.status()).isEqualTo("FAILED");
+        assertThat(response.message()).isEqualTo("CoreBank: CoreBank Error | Biller: Biller Error");
     }
 
     @Test

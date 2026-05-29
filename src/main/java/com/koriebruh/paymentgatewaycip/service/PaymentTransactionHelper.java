@@ -47,10 +47,21 @@ public class PaymentTransactionHelper {
     private String topicFailed;
 
     @Transactional(readOnly = true)
-    public Optional<PaymentResponse> getExistingIdempotentResponse(String idempotencyKey, String traceId) {
+    public Optional<PaymentResponse> getExistingIdempotentResponse(String idempotencyKey, PaymentRequest request, String traceId) {
         var existingTxOpt = transactionRepository.findByIdempotencyKey(idempotencyKey);
         if (existingTxOpt.isPresent()) {
             var existingTx = existingTxOpt.get();
+
+            boolean isSamePayload = existingTx.getOrderId().equals(request.orderId()) &&
+                    existingTx.getAmount().compareTo(request.amount()) == 0 &&
+                    existingTx.getCurrency().equals(request.currency()) &&
+                    existingTx.getPaymentMethod().equals(request.paymentMethod()) &&
+                    existingTx.getChannel().name().equalsIgnoreCase(request.channel());
+
+            if (!isSamePayload) {
+                throw com.koriebruh.paymentgatewaycip.exceptions.BusinessException.duplicateIdempotencyKey(idempotencyKey);
+            }
+
             log.info("Idempotent request received, returning existing transaction id={} status={} traceId={}",
                     existingTx.getId(), existingTx.getStatus(), traceId);
             return Optional.of(new PaymentResponse(

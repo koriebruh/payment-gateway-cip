@@ -51,6 +51,12 @@ public class BusinessException extends RuntimeException {
                 HttpStatus.CONFLICT, "DUPLICATE_ORDER");
     }
 
+    public static BusinessException duplicateIdempotencyKey(String idempotencyKey) {
+        return new BusinessException(
+                "Duplicate idempotency key used with different payload: " + idempotencyKey,
+                HttpStatus.CONFLICT, "DUPLICATE_IDEMPOTENCY_KEY");
+    }
+
     public static BusinessException invalidChannel(String channel) {
         return new BusinessException(
                 "Unsupported channel: " + channel,

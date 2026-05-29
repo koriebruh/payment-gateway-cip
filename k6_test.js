@@ -11,7 +11,8 @@ export const options = {
     ],
     thresholds: {
         http_req_duration: ['p(95)<2000'], // 95% request harus selesai di bawah 2 detik
-        http_req_failed: ['rate<0.01'],    // Tingkat error (gagal) harus di bawah 1%
+        // Tingkat error di-set max 60% karena di skenario ini kita SENGAJA menembak 3 request yang pasti gagal (422, 502, 409)
+        http_req_failed: ['rate<=0.60'],    
     },
 };
 
@@ -108,8 +109,8 @@ export default function (data) {
     });
 
     check(res, {
-        '2. CoreBank Fail - status is 200': (r) => r.status === 200,
-        '2. CoreBank Fail - status field is FAILED': (r) => r.json('data.status') === 'FAILED'
+        '2. CoreBank Fail - status is 422': (r) => r.status === 422,
+        '2. CoreBank Fail - status field is FAILED': (r) => r.json('status') === 'FAILED'
     });
     // Selesai satu flow iterasi, beri jeda sedikit agar tidak membebani CPU test runner
     sleep(0.3);
@@ -133,8 +134,8 @@ export default function (data) {
     });
 
     check(res, {
-        '3. Biller Fail - status is 200': (r) => r.status === 200,
-        '3. Biller Fail - status field is FAILED': (r) => r.json('data.status') === 'FAILED'
+        '3. Biller Fail - status is 502': (r) => r.status === 502,
+        '3. Biller Fail - status field is FAILED': (r) => r.json('status') === 'FAILED'
     });
     // Selesai satu flow iterasi, beri jeda sedikit agar tidak membebani CPU test runner
     sleep(0.3);
@@ -171,10 +172,9 @@ export default function (data) {
         headers: Object.assign({}, headers, { 'Idempotency-Key': dupIdempKey })
     });
 
-    // Kita expect existing transaction dikembalikan (200 atau 201) ATAU terjadi HTTP 409 Conflict. 
-    // Bergantung pada implementasi backend idempotency nya (entah ngembaliin hasil awal atau nge-throw error).
+    // Kita expect HTTP 409 Conflict karena Idempotency-Key sama tapi payload berbeda
     check(res, {
-        '4. Idempotency Check - Returns early or conflicts': (r) => r.status === 200 || r.status === 201 || r.status === 409
+        '4. Idempotency Check - Conflicts (409)': (r) => r.status === 409
     });
     sleep(1);
 
