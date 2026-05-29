@@ -1,5 +1,31 @@
 services:
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payment_gateway_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    volumes:
+      - app_logs:/var/log/payment-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/api/actuator/health | grep -q '\"status\":\"UP\"'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   postgres:
     image: postgres:16-alpine
     container_name: pg_payment_gateway
@@ -98,6 +124,12 @@ services:
     volumes:
       - ./src/main/resources/keys:/opt/keycloak/keys
       - ./keycloak:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   jaeger:
     image: jaegertracing/all-in-one:1.56
@@ -114,3 +146,4 @@ volumes:
   kafka_data:
   zk_data:
   zk_log:
+  app_logs:

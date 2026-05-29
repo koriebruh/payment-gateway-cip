@@ -1,0 +1,193 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  application:
+    name: payment-gateway-cip
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+  # -------------------------------
+  # DATABASE CONFIGURATION
+  # -------------------------------
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: HikariPool-PaymentGateway
+      maximum-pool-size: 30
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: public
+        jdbc:
+          time_zone: Asia/Jakarta
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    out-of-order: false
+
+  # -------------------------------
+  # KAFKA CONFIGURATION
+  # -------------------------------
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    template:
+      observation-enabled: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+        max.in.flight.requests.per.connection: 1
+        delivery.timeout.ms: 120000
+        linger.ms: 5
+        batch.size: 16384
+    consumer:
+      group-id: payment-gateway-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.koriebruh.paymentgatewaycip.event"
+        spring.json.use.type.headers: false
+      enable-auto-commit: false
+    listener:
+      observation-enabled: true
+      ack-mode: MANUAL_IMMEDIATE
+
+  # -------------------------------
+  # OAUTH2 CONFIGURATION
+  # -------------------------------
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # issuer-uri: ${KEYCLOAK_URL_ISSUER} # Dihapus agar tidak terjadi Issuer Mismatch antara token dari localhost vs config di docker
+          jwk-set-uri: ${KEYCLOAK_URL_JWK}
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 20
+    connection-timeout: 5000
+
+  # -------------------------------
+  # OBSERVABILITY CONFIGURATION
+  # -------------------------------
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+          transport: http
+    metrics:
+      export:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+  health:
+    circuitbreakers:
+      enabled: true
+
+
+  # -------------------------------
+  # CIRCUIT BREAKER CONFIGURATION
+  # -------------------------------
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      corebank:
+        register-health-indicator: true
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 40
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 3s
+        event-consumer-buffer-size: 20
+      biller:
+        register-health-indicator: true
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 40
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 5s
+        event-consumer-buffer-size: 20
+
+  # -----------------------------------
+  # SWAGGER AND LOGGING CONFIGURATION
+  # -----------------------------------
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.koriebruh.paymentgatewaycip: INFO
+    org.springframework.kafka: WARN
+    org.flywaydb: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [traceId=%X{traceId}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [traceId=%X{traceId}] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_PATH:/var/log/payment-gateway}/payment-gateway.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 3GB
+      file-name-pattern: ${LOG_PATH:/var/log/payment-gateway}/payment-gateway.%d{yyyy-MM-dd}.%i.log.gz
+
+  # -----------------------------------------
+  # OUTBOX TX DAN TOPIC KAFKA CONFIGURATION
+  # -----------------------------------------
+
+app:
+  kafka:
+    topics:
+      transaction-created: payment.transaction.created
+      transaction-failed: payment.transaction.failed
+  outbox:
+    poll-rate: 3000
