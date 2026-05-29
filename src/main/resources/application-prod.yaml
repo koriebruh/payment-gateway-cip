@@ -155,11 +155,22 @@ resilience4j:
   # SWAGGER AND LOGGING CONFIGURATION
   # -----------------------------------
 
+# PROD
+#springdoc:
+#  api-docs:
+#    enabled: false
+#  swagger-ui:
+#    enabled: false
+
 springdoc:
   api-docs:
-    enabled: false
+    path: /v3/api-docs
   swagger-ui:
-    enabled: false
+    path: /swagger-ui.html
+    display-request-duration: true
+    groups-order: DESC
+    operations-sorter: method
+
 
 logging:
   level:
