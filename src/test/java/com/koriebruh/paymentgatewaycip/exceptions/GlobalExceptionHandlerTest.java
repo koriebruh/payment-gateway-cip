@@ -34,8 +34,8 @@ class GlobalExceptionHandlerTest {
         
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).isEqualTo("Error msg");
-        assertThat(response.getBody().getErrors()).containsExactly("NOT_FOUND");
+        assertThat(response.getBody().message()).isEqualTo("Error msg");
+        assertThat(response.getBody().errors()).containsExactly("NOT_FOUND");
     }
 
     @Test
@@ -51,8 +51,8 @@ class GlobalExceptionHandlerTest {
         
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).isEqualTo("Validation failed");
-        assertThat(response.getBody().getErrors()).containsExactly("must not be blank");
+        assertThat(response.getBody().message()).isEqualTo("Validation failed");
+        assertThat(response.getBody().errors()).containsExactly("must not be blank");
     }
 
     @Test
@@ -63,8 +63,8 @@ class GlobalExceptionHandlerTest {
         
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).contains("Missing required header: Idempotency-Key");
-        assertThat(response.getBody().getErrors()).containsExactly("MISSING_HEADER");
+        assertThat(response.getBody().message()).contains("Missing required header: Idempotency-Key");
+        assertThat(response.getBody().errors()).containsExactly("MISSING_HEADER");
     }
 
     @Test
@@ -80,7 +80,7 @@ class GlobalExceptionHandlerTest {
         
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getErrors()).containsExactly("CIRCUIT_OPEN");
+        assertThat(response.getBody().errors()).containsExactly("CIRCUIT_OPEN");
     }
 
     @Test
@@ -91,6 +91,6 @@ class GlobalExceptionHandlerTest {
         
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).isEqualTo("An unexpected error occurred.");
+        assertThat(response.getBody().message()).isEqualTo("An unexpected error occurred.");
     }
 }

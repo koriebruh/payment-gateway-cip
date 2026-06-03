@@ -14,6 +14,8 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -34,8 +36,9 @@ class PaymentTransactionHelperTest {
     private OutboxEventRepository outboxEventRepository;
 
 
-    @InjectMocks
     private PaymentTransactionHelper helper;
+
+    private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Captor
     private ArgumentCaptor<Transaction> txCaptor;
@@ -45,8 +48,7 @@ class PaymentTransactionHelperTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(helper, "topicCreated", "payment.transaction.created");
-        ReflectionTestUtils.setField(helper, "topicFailed", "payment.transaction.failed");
+        helper = new PaymentTransactionHelper(transactionRepository, outboxEventRepository, objectMapper, "payment.transaction.created", "payment.transaction.failed");
     }
 
     @Test
@@ -118,7 +120,7 @@ class PaymentTransactionHelperTest {
 
         verify(outboxEventRepository).save(outboxCaptor.capture());
         OutboxEvent outboxEvent = outboxCaptor.getValue();
-        assertThat(outboxEvent.getTopic()).isEqualTo("payment.transaction.failed");
+        assertThat(outboxEvent.getEventType()).isEqualTo("payment.transaction.failed");
         assertThat(outboxEvent.getAggregateId()).isEqualTo(tx.getId());
         assertThat(outboxEvent.getPayload()).contains("ORD-1");
         assertThat(outboxEvent.getPayload()).contains("FAILED");
@@ -145,7 +147,7 @@ class PaymentTransactionHelperTest {
 
         verify(outboxEventRepository).save(outboxCaptor.capture());
         OutboxEvent outboxEvent = outboxCaptor.getValue();
-        assertThat(outboxEvent.getTopic()).isEqualTo("payment.transaction.created");
+        assertThat(outboxEvent.getEventType()).isEqualTo("payment.transaction.created");
         assertThat(outboxEvent.getAggregateId()).isEqualTo(tx.getId());
         assertThat(outboxEvent.getPayload()).contains("SUCCESS");
     }

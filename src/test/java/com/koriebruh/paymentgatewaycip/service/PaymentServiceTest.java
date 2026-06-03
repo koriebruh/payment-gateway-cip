@@ -133,8 +133,6 @@ class PaymentServiceTest {
         
         when(coreBankingClient.debit(anyString(), any(), anyString(), any(), anyString()))
                 .thenReturn(new CoreBankingClient.CoreBankingResponse(false, null, "Insufficient funds"));
-        when(billerClient.pay(anyString(), any(), anyString(), any(), anyString()))
-                .thenReturn(new BillerClient.BillerResponse(true, "BL-123", null));
 
         PaymentResponse failResponse = new PaymentResponse(pendingTx.getId().toString(), "ORD-1", "FAILED", null, null, "Failed");
         when(transactionHelper.failTransaction(eq(pendingTx), anyString(), any())).thenReturn(failResponse);
@@ -162,8 +160,6 @@ class PaymentServiceTest {
         
         when(coreBankingClient.debit(anyString(), any(), anyString(), any(), anyString()))
                 .thenReturn(new CoreBankingClient.CoreBankingResponse(false, null, "Error CB"));
-        when(billerClient.pay(anyString(), any(), anyString(), any(), anyString()))
-                .thenReturn(new BillerClient.BillerResponse(false, null, "Error BL"));
 
         PaymentResponse failResponse = new PaymentResponse(pendingTx.getId().toString(), "ORD-1", "FAILED", null, null, "Failed");
         when(transactionHelper.failTransaction(eq(pendingTx), anyString(), any())).thenReturn(failResponse);
@@ -171,7 +167,7 @@ class PaymentServiceTest {
         PaymentResponse response = paymentService.processPayment(request, idempotencyKey);
 
         assertThat(response.status()).isEqualTo("FAILED");
-        verify(transactionHelper).failTransaction(eq(pendingTx), eq("CoreBank: Error CB | Biller: Error BL"), any());
+        verify(transactionHelper).failTransaction(eq(pendingTx), eq("CoreBank: Error CB"), any());
     }
 
     @Test
@@ -225,16 +221,14 @@ class PaymentServiceTest {
         
         when(coreBankingClient.debit(any(), any(), any(), any(), any()))
                 .thenReturn(new CoreBankingClient.CoreBankingResponse(false, null, "CoreBank Error"));
-        when(billerClient.pay(any(), any(), any(), any(), any()))
-                .thenReturn(new BillerClient.BillerResponse(false, null, "Biller Error"));
                 
-        PaymentResponse failedResponse = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "CoreBank: CoreBank Error | Biller: Biller Error");
-        when(transactionHelper.failTransaction(eq(pendingTx), eq("CoreBank: CoreBank Error | Biller: Biller Error"), any())).thenReturn(failedResponse);
+        PaymentResponse failedResponse = new PaymentResponse("TX-1", "ORD-1", "FAILED", null, null, "CoreBank: CoreBank Error");
+        when(transactionHelper.failTransaction(eq(pendingTx), eq("CoreBank: CoreBank Error"), any())).thenReturn(failedResponse);
 
         PaymentResponse response = paymentService.processPayment(request, "IDEMP");
 
         assertThat(response.status()).isEqualTo("FAILED");
-        assertThat(response.message()).isEqualTo("CoreBank: CoreBank Error | Biller: Biller Error");
+        assertThat(response.message()).isEqualTo("CoreBank: CoreBank Error");
     }
 
     @Test

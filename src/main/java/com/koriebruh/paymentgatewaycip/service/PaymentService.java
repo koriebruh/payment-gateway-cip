@@ -8,6 +8,7 @@ import com.koriebruh.paymentgatewaycip.mock.BillerClient;
 import com.koriebruh.paymentgatewaycip.mock.CoreBankingClient;
 import com.koriebruh.paymentgatewaycip.repository.TransactionRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -64,39 +65,39 @@ public class PaymentService {
         var tx = transactionHelper.savePending(request, parseChannel(request.channel()), idempotencyKey);
         log.info("Transaction persisted id={} status=PENDING traceId={}", tx.getId(), traceId);
 
-        var bankFuture = CompletableFuture.supplyAsync(
-                () -> callCoreBank(tx.getAccount(), tx.getAmount(), request.orderId(), traceId, jwtToken), taskExecutor);
-        var billerFuture = CompletableFuture.supplyAsync(
-                () -> callBiller(request.orderId(), tx.getAmount(), request.paymentMethod(), traceId, jwtToken), taskExecutor);
+        try {
+            // Sequential execution to prevent Biller payment if CoreBank debit fails
+            var bankResp = callCoreBank(tx.getAccount(), tx.getAmount(), request.orderId(), traceId, jwtToken).join();
+            if (!bankResp.success()) {
+                var reason = "CoreBank: %s".formatted(bankResp.failureReason());
+                log.warn("Payment rejected — reason={} traceId={}", reason, traceId);
+                return transactionHelper.failTransaction(tx, reason, traceId);
+            }
 
-        CompletableFuture.allOf(bankFuture, billerFuture).join();
+            var billerResp = callBiller(request.orderId(), tx.getAmount(), request.paymentMethod(), traceId, jwtToken).join();
+            if (!billerResp.success()) {
+                var reason = "Biller: %s".formatted(billerResp.failureReason());
+                log.warn("Payment rejected — reason={} traceId={}", reason, traceId);
+                // Note: Real system would require a compensating transaction to reverse CoreBank debit here (Saga)
+                return transactionHelper.failTransaction(tx, reason, traceId);
+            }
 
-        var bankResp = bankFuture.join();
-        var billerResp = billerFuture.join();
-
-        if (bankResp.success() && billerResp.success()) {
             log.info("Payment approved — corebankRef={} billerRef={} traceId={}",
                     bankResp.corebankReference(), billerResp.billerReference(), traceId);
             return transactionHelper.succeedTransaction(tx, bankResp.corebankReference(), billerResp.billerReference(), traceId);
-        }
 
-        var reason = buildFailureReason(bankResp, billerResp);
-        log.warn("Payment rejected — reason={} traceId={}", reason, traceId);
-        return transactionHelper.failTransaction(tx, reason, traceId);
+        } catch (Exception ex) {
+            log.error("Unexpected error during processPayment traceId={} error={}", traceId, ex.getMessage(), ex);
+            return transactionHelper.failTransaction(tx, "Internal Processing Error", traceId);
+        }
     }
 
-    private String buildFailureReason(CoreBankingClient.CoreBankingResponse bankResp, BillerClient.BillerResponse billerResp) {
-        if (!bankResp.success() && !billerResp.success()) {
-            return "CoreBank: " + bankResp.failureReason() + " | Biller: " + billerResp.failureReason();
-        }
-        return !bankResp.success() ? "CoreBank: " + bankResp.failureReason() : "Biller: " + billerResp.failureReason();
-    }
 
     @Observed(name = "payment.status", contextualName = "getPaymentStatus")
     @Transactional(readOnly = true)
     public PaymentResponse getStatus(String orderId) {
         var tx = transactionRepository.findByOrderId(orderId)
-                .orElseThrow(() -> BusinessException.notFound("Transaction not found: " + orderId));
+                .orElseThrow(() -> BusinessException.notFound("Transaction not found: %s".formatted(orderId)));
 
         return new PaymentResponse(
                 tx.getId().toString(),
@@ -108,26 +109,40 @@ public class PaymentService {
         );
     }
 
-    @CircuitBreaker(name = "corebank")
+    @CircuitBreaker(name = "corebank", fallbackMethod = "coreBankFallback")
+    @TimeLimiter(name = "corebank", fallbackMethod = "coreBankFallback")
     @Observed(name = "corebank.debit", contextualName = "coreBankDebit")
-    protected CoreBankingClient.CoreBankingResponse callCoreBank(
+    protected CompletableFuture<CoreBankingClient.CoreBankingResponse> callCoreBank(
             String account, BigDecimal amount, String orderId, String traceId, String jwtToken) {
-        return coreBankingClient.debit(account, amount, orderId, traceId, jwtToken);
+        return CompletableFuture.supplyAsync(() -> coreBankingClient.debit(account, amount, orderId, traceId, jwtToken), taskExecutor);
     }
 
-    @CircuitBreaker(name = "biller")
+    protected CompletableFuture<CoreBankingClient.CoreBankingResponse> coreBankFallback(
+            String account, BigDecimal amount, String orderId, String traceId, String jwtToken, Throwable ex) {
+        log.warn("event=corebank_fallback orderId={} reason={}", orderId, ex.getMessage());
+        return CompletableFuture.completedFuture(new CoreBankingClient.CoreBankingResponse(false, null, "Service Unavailable: %s".formatted(ex.getMessage())));
+    }
+
+    @CircuitBreaker(name = "biller", fallbackMethod = "billerFallback")
+    @TimeLimiter(name = "biller", fallbackMethod = "billerFallback")
     @Observed(name = "biller.pay", contextualName = "billerPay")
-    protected BillerClient.BillerResponse callBiller(
+    protected CompletableFuture<BillerClient.BillerResponse> callBiller(
             String orderId, BigDecimal amount, String paymentMethod, String traceId, String jwtToken) {
-        return billerClient.pay(orderId, amount, paymentMethod, traceId, jwtToken);
+        return CompletableFuture.supplyAsync(() -> billerClient.pay(orderId, amount, paymentMethod, traceId, jwtToken), taskExecutor);
+    }
+
+    protected CompletableFuture<BillerClient.BillerResponse> billerFallback(
+            String orderId, BigDecimal amount, String paymentMethod, String traceId, String jwtToken, Throwable ex) {
+        log.warn("event=biller_fallback orderId={} reason={}", orderId, ex.getMessage());
+        return CompletableFuture.completedFuture(new BillerClient.BillerResponse(false, null, "Service Unavailable: %s".formatted(ex.getMessage())));
     }
 
     private String extractJwtToken() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getTokenValue();
-        }
-        return null;
+        return switch (auth) {
+            case JwtAuthenticationToken jwt -> jwt.getToken().getTokenValue();
+            case null, default -> throw BusinessException.unauthorized();
+        };
     }
 
     private Transaction.Channel parseChannel(String raw) {

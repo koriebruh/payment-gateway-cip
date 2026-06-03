@@ -52,7 +52,7 @@ class TransactionOutboxSchedulerTest {
         OutboxEvent event = OutboxEvent.builder()
                 .id(UUID.randomUUID())
                 .aggregateId(eventId.toString())
-                .topic("test.topic")
+                .eventType("test.topic")
                 .payload("{\"key\":\"value\"}")
                 .build();
 
@@ -78,7 +78,7 @@ class TransactionOutboxSchedulerTest {
         OutboxEvent event = OutboxEvent.builder()
                 .id(UUID.randomUUID())
                 .aggregateId(eventId.toString())
-                .topic("test.topic")
+                .eventType("test.topic")
                 .payload("{\"key\":\"value\"}")
                 .build();
 

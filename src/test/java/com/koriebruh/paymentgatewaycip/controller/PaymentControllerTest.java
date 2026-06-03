@@ -48,7 +48,7 @@ class PaymentControllerTest {
 
         when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -65,7 +65,7 @@ class PaymentControllerTest {
 
         when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -81,7 +81,7 @@ class PaymentControllerTest {
 
         when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -96,7 +96,7 @@ class PaymentControllerTest {
 
         when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -111,7 +111,7 @@ class PaymentControllerTest {
 
         when(paymentService.processPayment(any(PaymentRequest.class), eq("IDEMP-1"))).thenReturn(response);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .header("Idempotency-Key", "IDEMP-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -123,7 +123,7 @@ class PaymentControllerTest {
     void processPayment_WhenMissingIdempotencyKey_ShouldReturn400() throws Exception {
         PaymentRequest request = new PaymentRequest("ORD-1", "MOBILE_BANKING", BigDecimal.TEN, "IDR", "VA");
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/v1/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -135,7 +135,7 @@ class PaymentControllerTest {
 
         when(paymentService.getStatus("ORD-1")).thenReturn(response);
 
-        mockMvc.perform(get("/payments/ORD-1")
+        mockMvc.perform(get("/v1/payments/ORD-1")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.order_id").value("ORD-1"))

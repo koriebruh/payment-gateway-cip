@@ -22,6 +22,7 @@ public class TransactionOutboxScheduler {
     private static final Logger log = LoggerFactory.getLogger(TransactionOutboxScheduler.class);
 
     private final OutboxEventRepository outboxEventRepository;
+
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-rate:5000}")
@@ -35,15 +36,16 @@ public class TransactionOutboxScheduler {
         log.info("Processing {} outbox events...", events.size());
 
         for (OutboxEvent event : events) {
-            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(event.getTopic(), event.getAggregateId(), event.getPayload());
+            log.info("Publishing outbox event id={} eventType={}", event.getId(), event.getEventType());
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(event.getEventType(), event.getAggregateId(), event.getPayload());
 
             future.whenComplete((result, ex) -> {
                 if (ex != null) {
                     log.error("[Outbox] Failed to send to Kafka — topic={} key={} err={}",
-                            event.getTopic(), event.getAggregateId(), ex.getMessage(), ex);
+                            event.getEventType(), event.getAggregateId(), ex.getMessage(), ex);
                 } else {
                     log.info("[Outbox] Sent to Kafka — topic={} partition={} offset={}",
-                            event.getTopic(),
+                            event.getEventType(),
                             result.getRecordMetadata().partition(),
                             result.getRecordMetadata().offset());
                 }

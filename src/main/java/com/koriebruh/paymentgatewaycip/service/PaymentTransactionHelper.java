@@ -4,11 +4,11 @@ import com.koriebruh.paymentgatewaycip.dto.PaymentRequest;
 import com.koriebruh.paymentgatewaycip.dto.PaymentResponse;
 import com.koriebruh.paymentgatewaycip.entity.Transaction;
 import com.koriebruh.paymentgatewaycip.event.model.TransactionSuccessEvent;
-import com.koriebruh.paymentgatewaycip.event.producer.TransactionEventProducer;
+import com.koriebruh.paymentgatewaycip.exceptions.BusinessException;
 import com.koriebruh.paymentgatewaycip.repository.TransactionRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,21 +30,34 @@ import io.micrometer.observation.annotation.Observed;
  * within the same bean bypasses Spring AOP, making transactions inactive.
  */
 @Component
-@RequiredArgsConstructor
 @Observed(name = "payment.transaction.helper")
 public class PaymentTransactionHelper {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentTransactionHelper.class);
 
     private final TransactionRepository transactionRepository;
+
     private final OutboxEventRepository outboxEventRepository;
-    private final ObjectMapper          objectMapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
-    @Value("${app.kafka.topics.transaction-created}")
-    private String topicCreated;
+    private final ObjectMapper objectMapper;
 
-    @Value("${app.kafka.topics.transaction-failed}")
-    private String topicFailed;
+    private final String topicCreated;
+
+    private final String topicFailed;
+
+    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
+    public PaymentTransactionHelper(
+            TransactionRepository transactionRepository,
+            OutboxEventRepository outboxEventRepository,
+            ObjectMapper objectMapper,
+            @Value("${app.kafka.topics.transaction-created}") String topicCreated,
+            @Value("${app.kafka.topics.transaction-failed}") String topicFailed) {
+        this.transactionRepository = transactionRepository;
+        this.outboxEventRepository = outboxEventRepository;
+        this.objectMapper = objectMapper;
+        this.topicCreated = topicCreated;
+        this.topicFailed = topicFailed;
+    }
 
     @Transactional(readOnly = true)
     public Optional<PaymentResponse> getExistingIdempotentResponse(String idempotencyKey, PaymentRequest request, String traceId) {
@@ -59,7 +72,7 @@ public class PaymentTransactionHelper {
                     existingTx.getChannel().name().equalsIgnoreCase(request.channel());
 
             if (!isSamePayload) {
-                throw com.koriebruh.paymentgatewaycip.exceptions.BusinessException.duplicateIdempotencyKey(idempotencyKey);
+                throw BusinessException.duplicateIdempotencyKey(idempotencyKey);
             }
 
             log.info("Idempotent request received, returning existing transaction id={} status={} traceId={}",
@@ -78,17 +91,21 @@ public class PaymentTransactionHelper {
 
     @Transactional
     public Transaction savePending(PaymentRequest request, Transaction.Channel channel, String idempotencyKey) {
-        Transaction tx = Transaction.builder()
-                .idempotencyKey(idempotencyKey)
-                .orderId(request.orderId())
-                .channel(channel)
-                .amount(request.amount())
-                .account(request.orderId())
-                .currency(request.currency())
-                .paymentMethod(request.paymentMethod())
-                .status(Transaction.TransactionStatus.PENDING)
-                .build();
-        return transactionRepository.save(tx);
+        try {
+            Transaction tx = Transaction.builder()
+                    .idempotencyKey(idempotencyKey)
+                    .orderId(request.orderId())
+                    .channel(channel)
+                    .amount(request.amount())
+                    .account(request.orderId())
+                    .currency(request.currency())
+                    .paymentMethod(request.paymentMethod())
+                    .status(Transaction.TransactionStatus.PENDING)
+                    .build();
+            return transactionRepository.save(tx);
+        } catch (DataIntegrityViolationException ex) {
+            throw BusinessException.duplicateIdempotencyKey(idempotencyKey);
+        }
     }
 
     @Transactional
@@ -102,7 +119,7 @@ public class PaymentTransactionHelper {
                 tx.getOrderId(),
                 Transaction.TransactionStatus.FAILED.name(),
                 null, null,
-                "Transaction failed: " + reason
+                "Transaction failed: %s".formatted(reason)
         );
     }
 
@@ -131,12 +148,12 @@ public class PaymentTransactionHelper {
             OutboxEvent outboxEvent = OutboxEvent.builder()
                     .aggregateType("Transaction")
                     .aggregateId(tx.getId())
-                    .topic(topic)
+                    .eventType(topic)
                     .payload(payload)
                     .build();
             outboxEventRepository.save(outboxEvent);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to serialize OutboxEvent", e);
+            throw BusinessException.internalError("Failed to serialize OutboxEvent: %s".formatted(e.getMessage()));
         }
     }
 }

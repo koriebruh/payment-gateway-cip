@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        log.warn("[{}] Business exception — code={} msg={}", traceId(), ex.getErrorCode(), ex.getMessage());
+        log.warn("traceId={} event=business_exception code={} msg={}", traceId(), ex.getErrorCode(), ex.getMessage());
         return ResponseEntity
                 .status(ex.getStatus())
                 .body(buildError(ex.getMessage(), List.of(ex.getErrorCode())));
@@ -34,20 +34,20 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(FieldError::getDefaultMessage)
                 .toList();
-        log.warn("[{}] Validation failed — errors={}", traceId(), errors);
+        log.warn("traceId={} event=validation_failed errors={}", traceId(), errors);
         return ResponseEntity.badRequest().body(buildError("Validation failed", errors));
     }
 
     @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingHeader(org.springframework.web.bind.MissingRequestHeaderException ex) {
-        log.warn("[{}] Missing header — {}", traceId(), ex.getHeaderName());
-        return ResponseEntity.badRequest().body(buildError("Missing required header: " + ex.getHeaderName(), List.of("MISSING_HEADER")));
+        log.warn("traceId={} event=missing_header header={}", traceId(), ex.getHeaderName());
+        return ResponseEntity.badRequest().body(buildError("Missing required header: %s".formatted(ex.getHeaderName()), List.of("MISSING_HEADER")));
     }
 
     @ExceptionHandler(io.github.resilience4j.circuitbreaker.CallNotPermittedException.class)
     public ResponseEntity<ApiResponse<Void>> handleCircuitOpen(
             io.github.resilience4j.circuitbreaker.CallNotPermittedException ex) {
-        log.error("[{}] Circuit breaker OPEN — {}", traceId(), ex.getMessage());
+        log.error("traceId={} event=circuit_open msg={}", traceId(), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(buildError("External service temporarily unavailable. Please retry.", List.of("CIRCUIT_OPEN")));
@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
-        log.error("[{}] Unhandled exception — {}", traceId(), ex.getMessage(), ex);
+        log.error("traceId={} event=unhandled_exception msg={}", traceId(), ex.getMessage(), ex);
         return ResponseEntity
                 .internalServerError()
                 .body(buildError("An unexpected error occurred.", List.of()));

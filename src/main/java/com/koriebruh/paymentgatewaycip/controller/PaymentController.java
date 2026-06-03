@@ -18,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/v1/payments")
 @RequiredArgsConstructor
 @Tag(name = "Payments", description = "Payment processing operations")
 @SecurityRequirement(name = "bearerAuth")
@@ -44,7 +44,7 @@ public class PaymentController {
             @Valid @RequestBody PaymentRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
 
-        log.info("POST /payments orderId={} idempotencyKey={}", request.orderId(), idempotencyKey);
+        log.info("event=process_payment orderId={} idempotencyKey={}", request.orderId(), idempotencyKey);
         PaymentResponse result = paymentService.processPayment(request, idempotencyKey);
 
         if ("FAILED".equals(result.status())) {
@@ -73,7 +73,7 @@ public class PaymentController {
     })
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<PaymentResponse>> getStatus(@PathVariable String orderId) {
-        log.info("GET /payments/{}", orderId);
+        log.info("event=get_payment_status orderId={}", orderId);
         return ResponseEntity.ok(responseFactory.success(paymentService.getStatus(orderId)));
     }
 }
